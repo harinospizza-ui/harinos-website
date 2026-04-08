@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <link rel="manifest" href="/manifest.json" />
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta
+      http-equiv="Cache-Control"
+      content="no-store, no-cache, must-revalidate, proxy-revalidate"
+    />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <meta name="theme-color" content="#c4371b" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Harino's" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="format-detection" content="telephone=no" />
+    <title>Harino's Pizza</title>
+
+    <link rel="canonical" href="https://harinos.store" />
+    <meta
+      name="description"
+      content="Harino's Pizza - 100% Vegetarian handcrafted pizza, momos, and burgers. Order online at harinos.store."
+    />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://harinos.store/" />
+    <meta property="og:title" content="Harino's Pizza" />
+    <meta
+      property="og:description"
+      content="Harino's Pizza ordering app with live offers, WhatsApp checkout, and installable home-screen access. Because Hari Knows."
+    />
+    <meta
+      property="og:image"
+      content="https://drive.google.com/thumbnail?id=1Gz7Qi82EYLJZxm1EfFxpXHHQ6mhKQIc4&sz=w1200"
+    />
+
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://harinos.store/" />
+    <meta property="twitter:title" content="Harino's Pizza" />
+    <meta
+      property="twitter:description"
+      content="Install Harino's Pizza for faster ordering, live offers, and WhatsApp checkout."
+    />
+    <meta
+      property="twitter:image"
+      content="https://drive.google.com/thumbnail?id=1Gz7Qi82EYLJZxm1EfFxpXHHQ6mhKQIc4&sz=w1200"
+    />
+
+    <link rel="icon" type="image/png" href="/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+        scroll-behavior: smooth;
+        overflow-x: hidden;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .font-display {
+        font-family: 'Playfair Display', serif;
+      }
+
+      ::-webkit-scrollbar {
+        display: none;
+      }
+
+      body,
+      html {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+
+      .hide-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+
+      .hide-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+
+      @keyframes install-attention-pulse {
+        0%,
+        100% {
+          transform: scale(1);
+          box-shadow: 0 0 0 0 rgba(196, 55, 27, 0.32);
+          opacity: 1;
+        }
+        35% {
+          transform: scale(1.08);
+          box-shadow: 0 0 0 12px rgba(196, 55, 27, 0);
+          opacity: 1;
+        }
+        55% {
+          transform: scale(0.97);
+          opacity: 0.92;
+        }
+      }
+
+      @keyframes install-attention-shake {
+        0%,
+        100% {
+          translate: 0 0;
+        }
+        20% {
+          translate: -2px 0;
+        }
+        40% {
+          translate: 2px 0;
+        }
+        60% {
+          translate: -2px 0;
+        }
+        80% {
+          translate: 2px 0;
+        }
+      }
+
+      .install-attention {
+        animation:
+          install-attention-pulse 1.6s ease-in-out infinite,
+          install-attention-shake 0.55s ease-in-out infinite;
+        transform-origin: center;
+      }
+
+      @keyframes install-popup-float {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-6px);
+        }
+      }
+
+      @keyframes cta-glow {
+        0%,
+        100% {
+          box-shadow: 0 18px 40px rgba(220, 38, 38, 0.26);
+        }
+        50% {
+          box-shadow: 0 24px 56px rgba(220, 38, 38, 0.4);
+        }
+      }
+
+      .install-popup-card {
+        animation: install-popup-float 4s ease-in-out infinite;
+      }
+
+      .cta-glow {
+        animation: cta-glow 2.2s ease-in-out infinite;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
