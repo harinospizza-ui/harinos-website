@@ -46,7 +46,7 @@ export const OFFER_CARDS: OfferCard[] = [
     enabled: true,
 
     // Images
-    image: '/images/hari.jpeg',
+    image: '/images/vegover.jpeg',
 
     // Offer
     offerTitle: 'Buy any Large Pizza and get a burger free',
@@ -62,10 +62,10 @@ export const OFFER_CARDS: OfferCard[] = [
 
     // Additional Item
     // This exact menu item name will auto-add to the cart when the condition is met.
-    additionalItem: 'Tikka Burger',
+    additionalItem: 'Stuffed Garlic Bread',
 
     // Additional Item Image
-    additionalItemImage: '/images/tikkaburgar.jpeg',
+    additionalItemImage: '/images/stuffed.jpeg',
 
     // Notification
     notifyCustomers: true,
@@ -79,7 +79,7 @@ export const OFFER_CARDS: OfferCard[] = [
     enabled: true,
 
     // Images
-    image: '/images/vegover.jpeg',
+    image: '/images/hari.jpeg',
 
     // Offer
     offerTitle: "New launch: Harino's Special",
@@ -94,10 +94,10 @@ export const OFFER_CARDS: OfferCard[] = [
 
     // Additional Item
     // This exact menu item name will auto-add to the cart when the condition is met.
-    additionalItem: 'Stuffed Garlic Bread',
+    additionalItem: 'Tikka Burger',
 
     // Additional Item Image
-    additionalItemImage: '/images/stuffed.jpeg',
+    additionalItemImage: '/images/tikkaburgar.jpeg',
 
     // Notification
     notifyCustomers: true,
