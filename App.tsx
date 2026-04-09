@@ -9,6 +9,7 @@ import {
   Order,
   OrderItem,
   OrderType,
+  OutletConfig,
 } from './types';
 import { MENU_ITEMS, OFFER_CARDS, OUTLET_LOCATIONS } from './constants';
 import { StorageService } from './services/storage';
@@ -28,6 +29,7 @@ import {
   findNearestOutletByRoadDistance,
   sanitizePhoneNumber,
 } from './outletUtils';
+import { getDeliveryPricingSummary } from './deliveryPricing';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import OfferCarousel from './components/OfferCarousel';
@@ -36,12 +38,19 @@ import CartSidebar from './components/CartSidebar';
 import PastOrders from './components/PastOrders';
 import PaymentModal from './components/PaymentModal';
 import InstallPopup from './components/InstallPopup';
+import ServiceModeModal from './components/ServiceModeModal';
 import { useSwipeDismiss } from './hooks/useSwipeDismiss';
 
 const DISPLAY_OFFERS = OFFER_CARDS.slice(0, 3);
 const APP_HISTORY_NAMESPACE = 'harinos-ui';
 
 type AppScreen = 'menu' | 'orders' | 'category' | 'cart' | 'payment' | 'success';
+
+interface ResolvedOrderContext {
+  customerLocation: CustomerLocation | null;
+  outlet: OutletConfig;
+  distanceKm: number | null;
+}
 
 const App: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('All');
@@ -52,6 +61,7 @@ const App: React.FC = () => {
   const [showOrderSuccess, setShowOrderSuccess] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
   const [orderType, setOrderType] = useState<OrderType>('takeaway');
+  const [isServiceModeModalOpen, setIsServiceModeModalOpen] = useState(true);
   const [customerLocation, setCustomerLocation] = useState<CustomerLocation | null>(null);
   const [view, setView] = useState<'menu' | 'orders'>('menu');
   const [pastOrders, setPastOrders] = useState<Order[]>(StorageService.getPastOrders());
@@ -115,6 +125,10 @@ const App: React.FC = () => {
   );
   const nearestOutlet = nearestOutletMatch?.outlet ?? null;
   const outletDistanceKm = nearestOutletMatch?.distanceKm ?? null;
+  const selectedOutlet = useMemo(
+    () => nearestOutlet ?? activeOutlets[0] ?? null,
+    [activeOutlets, nearestOutlet],
+  );
 
   useEffect(() => {
     const currentState = window.history.state as { app?: string; screen?: AppScreen } | null;
@@ -249,7 +263,9 @@ const App: React.FC = () => {
     [applyAppScreen, replaceAppScreen, scrollMenuIntoView],
   );
 
-  const detectLocation = useCallback(async (): Promise<CustomerLocation | null> => {
+  const detectLocation = useCallback(async (
+    options?: { silentFailure?: boolean },
+  ): Promise<CustomerLocation | null> => {
     if (!activeOutlets.length) {
       alert('No active outlet is configured right now. Add a live outlet in constants.tsx before accepting orders.');
       return null;
@@ -277,7 +293,11 @@ const App: React.FC = () => {
 
       return resolvedLocation;
     } catch (error) {
-      alert('Location is mandatory so we can route your order to the nearest outlet.');
+      if (options?.silentFailure) {
+        showNotification('Enable location so we can calculate road distance and delivery charges.');
+      } else {
+        alert('Location is mandatory so we can calculate delivery distance and route your order.');
+      }
       return null;
     }
   }, [activeOutlets.length, refreshNearestOutletMatch, showNotification]);
@@ -296,11 +316,13 @@ const App: React.FC = () => {
     }
 
     if (type === 'delivery' && !customerLocation) {
-      const resolvedLocation = await detectLocation();
-      if (!resolvedLocation) {
-        setOrderType('takeaway');
-      }
+      await detectLocation({ silentFailure: true });
     }
+  };
+
+  const handleServiceModeSelection = async (type: OrderType) => {
+    await handleOrderTypeChange(type);
+    setIsServiceModeModalOpen(false);
   };
 
   const handleShare = async () => {
@@ -387,10 +409,23 @@ const App: React.FC = () => {
     NotificationService.notifyOfferReleases(activeOfferCards, { force: true });
   }, [activeOfferCards]);
 
-  const resolveNearestOutletForOrder = useCallback(async () => {
+  const resolveOrderContext = useCallback(async (): Promise<ResolvedOrderContext | null> => {
     if (!activeOutlets.length) {
       alert('No active outlet is configured right now. Add a live outlet in constants.tsx before accepting orders.');
       return null;
+    }
+
+    if (orderType !== 'delivery') {
+      if (!selectedOutlet) {
+        alert('No active outlet is configured right now. Add a live outlet in constants.tsx before accepting orders.');
+        return null;
+      }
+
+      return {
+        customerLocation,
+        outlet: selectedOutlet,
+        distanceKm: null,
+      };
     }
 
     const resolvedLocation = customerLocation ?? (await detectLocation());
@@ -414,9 +449,17 @@ const App: React.FC = () => {
 
     return {
       customerLocation: resolvedLocation,
-      outletMatch,
+      outlet: outletMatch.outlet,
+      distanceKm: outletMatch.distanceKm,
     };
-  }, [activeOutlets, customerLocation, detectLocation, refreshNearestOutletMatch]);
+  }, [
+    activeOutlets,
+    customerLocation,
+    detectLocation,
+    orderType,
+    refreshNearestOutletMatch,
+    selectedOutlet,
+  ]);
 
   const updateQuantity = (cartItemId: string, delta: number) => {
     setCart((currentCart) =>
@@ -502,30 +545,18 @@ const App: React.FC = () => {
     [pricedCart],
   );
 
+  const deliveryPricing = useMemo(
+    () => getDeliveryPricingSummary(nearestOutlet, outletDistanceKm, subtotal),
+    [nearestOutlet, outletDistanceKm, subtotal],
+  );
+
   const deliveryFee = useMemo(() => {
-    if (orderType !== 'delivery' || !nearestOutlet || outletDistanceKm === null) {
+    if (orderType !== 'delivery') {
       return 0;
     }
 
-    if (outletDistanceKm > nearestOutlet.deliveryRadiusKm) {
-      return -1;
-    }
-
-    if (subtotal < nearestOutlet.freeDeliveryMinimumOrder) {
-      return Math.max(
-        nearestOutlet.minimumDeliveryFee,
-        Math.round(outletDistanceKm * nearestOutlet.deliveryChargePerKm),
-      );
-    }
-
-    if (outletDistanceKm <= nearestOutlet.freeDeliveryRadiusKm) {
-      return 0;
-    }
-
-    return Math.round(
-      (outletDistanceKm - nearestOutlet.freeDeliveryRadiusKm) * nearestOutlet.deliveryChargePerKm,
-    );
-  }, [nearestOutlet, orderType, outletDistanceKm, subtotal]);
+    return deliveryPricing.fee;
+  }, [deliveryPricing.fee, orderType]);
 
   const finalDeliveryFee = orderType === 'delivery' && deliveryFee > 0 ? deliveryFee : 0;
   const currentTotal = subtotal + finalDeliveryFee;
@@ -538,7 +569,7 @@ const App: React.FC = () => {
       return;
     }
 
-    const checkoutContext = await resolveNearestOutletForOrder();
+    const checkoutContext = await resolveOrderContext();
     if (!checkoutContext) {
       return;
     }
@@ -548,9 +579,14 @@ const App: React.FC = () => {
     }
 
     if (orderType === 'delivery') {
-      if (checkoutContext.outletMatch.distanceKm > checkoutContext.outletMatch.outlet.deliveryRadiusKm) {
+      if (checkoutContext.distanceKm === null) {
+        alert('Location is required to calculate the delivery route.');
+        return;
+      }
+
+      if (checkoutContext.distanceKm > checkoutContext.outlet.deliveryRadiusKm) {
         alert(
-          `Sorry, ${checkoutContext.outletMatch.outlet.name} currently serves only up to ${checkoutContext.outletMatch.outlet.deliveryRadiusKm} km by road.`,
+          `Sorry, ${checkoutContext.outlet.name} currently serves only up to ${checkoutContext.outlet.deliveryRadiusKm} km by road.`,
         );
         return;
       }
@@ -562,17 +598,20 @@ const App: React.FC = () => {
   };
 
   const handlePaymentComplete = async () => {
-    const checkoutContext = await resolveNearestOutletForOrder();
+    const checkoutContext = await resolveOrderContext();
     if (!checkoutContext) {
-      showNotification('Location is still required to place this order.');
+      showNotification(
+        orderType === 'delivery'
+          ? 'Location is still required to place this order.'
+          : 'We could not match this order to an active outlet.',
+      );
       return;
     }
 
     setIsPaymentOpen(false);
 
-    const { customerLocation: resolvedLocation, outletMatch } = checkoutContext;
-    const { outlet } = outletMatch;
-    const locationString = resolvedLocation.mapUrl;
+    const { customerLocation: resolvedLocation, outlet, distanceKm } = checkoutContext;
+    const locationString = orderType === 'delivery' && resolvedLocation ? resolvedLocation.mapUrl : 'Not shared';
     const orderId = `HRN-${Date.now().toString().slice(-4)}`;
     const orderItems: OrderItem[] = pricedCart.map((item) => ({ ...item }));
     const newOrder: Order = {
@@ -587,7 +626,7 @@ const App: React.FC = () => {
       outletPhone: outlet.phone,
       outletAddress: outlet.address,
       customerLocationUrl: locationString,
-      distanceKm: outletMatch.distanceKm,
+      distanceKm,
     };
 
     try {
@@ -599,11 +638,11 @@ const App: React.FC = () => {
         deliveryFee: finalDeliveryFee,
         location: locationString,
         createdAt: new Date().toISOString(),
-        distanceKm: outletMatch.distanceKm,
+        distanceKm,
         outlet: {
           id: outlet.id,
           name: outlet.name,
-          address: outlet.address,
+          address: outlet.address ?? '',
           phone: outlet.phone,
         },
       });
@@ -623,6 +662,12 @@ const App: React.FC = () => {
       .join('\n');
 
     const outletAddressLine = outlet.address ? `OUTLET ADDRESS: ${outlet.address}\n` : '';
+    const roadDistanceLine =
+      orderType === 'delivery' && distanceKm !== null ? `ROAD DISTANCE: ${distanceKm.toFixed(1)} km\n` : '';
+    const locationSection =
+      orderType === 'delivery'
+        ? `*LOCATION:*\n${locationString}\n--------------------------\n`
+        : '';
     const whatsappMessage = `
 *HARINO'S ORDER - ${orderId}*
 --------------------------
@@ -631,8 +676,7 @@ PAYMENT: COMPLETED
 --------------------------
 OUTLET: ${outlet.name}
 OUTLET PHONE: ${outlet.phone}
-${outletAddressLine}ROAD DISTANCE: ${outletMatch.distanceKm.toFixed(1)} km
---------------------------
+${outletAddressLine}${roadDistanceLine}--------------------------
 *ITEMS:*
 ${itemsText}
 --------------------------
@@ -641,10 +685,7 @@ DELIVERY: Rs ${finalDeliveryFee.toFixed(2)}
 GST (5% INCL): Rs ${includedGst.toFixed(2)}
 *TOTAL: Rs ${currentTotal.toFixed(2)}*
 --------------------------
-*LOCATION:*
-${locationString}
---------------------------
-*BECAUSE HARI KNOWS*
+${locationSection}*BECAUSE HARI KNOWS*
     `.trim();
 
     window.open(`https://wa.me/${sanitizePhoneNumber(outlet.phone)}?text=${encodeURIComponent(whatsappMessage)}`, '_blank');
@@ -657,6 +698,13 @@ ${locationString}
 
   return (
     <div className="min-h-screen bg-slate-50/30 text-slate-900 overflow-x-hidden">
+      <ServiceModeModal
+        isOpen={isServiceModeModalOpen}
+        selectedType={orderType}
+        onSelect={handleServiceModeSelection}
+        storeStatus={statusMessage || 'Choose a service mode to continue.'}
+      />
+
       <Header
         cartCount={totalCartItems}
         onCartClick={openCartView}
@@ -666,7 +714,16 @@ ${locationString}
         onShare={handleShare}
         onNotificationsEnabled={handleNotificationsEnabled}
       />
-      <InstallPopup blocked={isCartOpen || isPaymentOpen || showOrderSuccess || isCategoryModalOpen || view === 'orders'} />
+      <InstallPopup
+        blocked={
+          isCartOpen ||
+          isPaymentOpen ||
+          showOrderSuccess ||
+          isCategoryModalOpen ||
+          isServiceModeModalOpen ||
+          view === 'orders'
+        }
+      />
 
       <main className="pt-20">
         {view === 'menu' ? (
@@ -807,7 +864,9 @@ ${locationString}
         orderType={orderType}
         setOrderType={handleOrderTypeChange}
         deliveryFee={deliveryFee}
+        deliveryPricing={deliveryPricing}
         nearestOutlet={nearestOutlet}
+        selectedOutlet={selectedOutlet}
         outletDistanceKm={outletDistanceKm}
         isResolvingOutletMatch={isResolvingOutletMatch}
         customerLocation={customerLocation}
@@ -821,8 +880,8 @@ ${locationString}
         onClose={closePaymentView}
         total={currentTotal}
         onPaymentComplete={handlePaymentComplete}
-        outletName={nearestOutlet?.name}
-        outletPhone={nearestOutlet?.phone}
+        outletName={selectedOutlet?.name}
+        outletPhone={selectedOutlet?.phone}
       />
 
       {notification && (

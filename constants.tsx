@@ -24,8 +24,8 @@ export const OUTLET_LOCATIONS: OutletConfig[] = [
     deliveryRadiusKm: 7,
     freeDeliveryRadiusKm: 3,
     freeDeliveryMinimumOrder: 150,
+    minimumOrderIncrementPerKm: 100,
     deliveryChargePerKm: 15,
-    minimumDeliveryFee: 15,
   },
 ];
 

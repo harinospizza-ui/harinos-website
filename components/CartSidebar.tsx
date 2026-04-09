@@ -1,5 +1,6 @@
 import React from 'react';
 import { CustomerLocation, Order, OrderType, OutletConfig, PricedCartItem } from '../types';
+import { DeliveryPricingSummary } from '../deliveryPricing';
 import { useSwipeDismiss } from '../hooks/useSwipeDismiss';
 import { getCartItemId } from '../offerUtils';
 
@@ -14,7 +15,9 @@ interface CartSidebarProps {
   orderType: OrderType;
   setOrderType: (type: OrderType) => void;
   deliveryFee: number;
+  deliveryPricing: DeliveryPricingSummary;
   nearestOutlet: OutletConfig | null;
+  selectedOutlet: OutletConfig | null;
   outletDistanceKm: number | null;
   isResolvingOutletMatch: boolean;
   customerLocation: CustomerLocation | null;
@@ -34,7 +37,9 @@ const CartSidebar: React.FC<CartSidebarProps> = ({
   orderType,
   setOrderType,
   deliveryFee,
+  deliveryPricing,
   nearestOutlet,
+  selectedOutlet,
   outletDistanceKm,
   isResolvingOutletMatch,
   customerLocation,
@@ -43,10 +48,14 @@ const CartSidebar: React.FC<CartSidebarProps> = ({
   onReorder,
 }) => {
   const isDeliveryImpossible = orderType === 'delivery' && deliveryFee === -1;
+  const isDeliveryRoutePending = orderType === 'delivery' && outletDistanceKm === null;
   const effectiveDeliveryFee = orderType === 'delivery' && deliveryFee > 0 ? deliveryFee : 0;
   const finalTotal = total + effectiveDeliveryFee;
   const includedGst = total - total / 1.05;
   const lastOrder = pastOrders.length > 0 ? pastOrders[0] : null;
+  const outletForDisplay = orderType === 'delivery' ? nearestOutlet : selectedOutlet;
+  const requiredMinimumOrder =
+    deliveryPricing.requiredMinimumOrder ?? nearestOutlet?.freeDeliveryMinimumOrder ?? 150;
   const swipeDismiss = useSwipeDismiss({ direction: 'right', onDismiss: onClose });
 
   return (
@@ -143,66 +152,123 @@ const CartSidebar: React.FC<CartSidebarProps> = ({
                 </button>
               </div>
 
-              <div className="mb-5 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-                <div className="mb-2 flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-[8px] font-black uppercase tracking-widest text-slate-400">
-                      Location Routing
+              {orderType === 'delivery' ? (
+                <>
+                  <div className="mb-5 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                    <div className="mb-2 flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-[8px] font-black uppercase tracking-widest text-slate-400">
+                          Location Routing
+                        </div>
+                        <div className="mt-1 text-sm font-bold text-slate-900">
+                          {nearestOutlet ? nearestOutlet.name : 'Nearest outlet not resolved yet'}
+                        </div>
+                      </div>
+                      <button
+                        onClick={onDetectLocation}
+                        className="text-[8px] font-black uppercase tracking-widest text-red-600 underline"
+                      >
+                        {customerLocation ? 'Refresh' : 'Enable'}
+                      </button>
                     </div>
-                    <div className="mt-1 text-sm font-bold text-slate-900">
-                      {nearestOutlet ? nearestOutlet.name : 'Nearest outlet not resolved yet'}
+
+                    {nearestOutlet ? (
+                      <div className="space-y-1.5 text-[10px] text-slate-600">
+                        {nearestOutlet.address ? (
+                          <p className="font-semibold text-slate-800">{nearestOutlet.address}</p>
+                        ) : null}
+                        <p>Phone: {nearestOutlet.phone}</p>
+                        <p>
+                          Road distance:{' '}
+                          {isResolvingOutletMatch
+                            ? 'Checking route...'
+                            : outletDistanceKm !== null
+                              ? `${outletDistanceKm.toFixed(1)} km`
+                              : 'Not available'}
+                        </p>
+                        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-700">
+                          Customer location is mandatory before order placement
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-slate-500">
+                        Allow location access so the app can calculate your road distance and route this order.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+                      <div className="mb-2 text-[9px] font-black uppercase tracking-widest text-blue-700">
+                        Delivery Conditions
+                      </div>
+                      <div className="space-y-1.5 text-[10px] font-medium text-blue-800/80">
+                        <p>Road distance is used for pricing, not straight-line distance.</p>
+                        <p>Up to 3 km: free delivery from Rs 150.</p>
+                        <p>4 km: Rs 250 minimum, 5 km: Rs 350 minimum, 6 km: Rs 450 minimum, 7 km: Rs 550 minimum.</p>
+                        <p>
+                          If the cart is below the required minimum for that route, delivery is charged at Rs{' '}
+                          {nearestOutlet?.deliveryChargePerKm ?? 15} per road km.
+                        </p>
+                        <p>Maximum delivery radius is {nearestOutlet?.deliveryRadiusKm ?? 7} road km.</p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
+                      <div className="mb-2 text-[9px] font-black uppercase tracking-widest text-emerald-700">
+                        Current Route
+                      </div>
+                      {deliveryFee === -1 ? (
+                        <p className="text-[10px] font-semibold text-red-700">
+                          This address is outside the delivery radius.
+                        </p>
+                      ) : outletDistanceKm !== null && deliveryPricing.requiredMinimumOrder !== null ? (
+                        <div className="space-y-1.5 text-[10px] text-emerald-900/85">
+                          <p>
+                            Your route is billed in the {deliveryPricing.distanceBandKm} km slab, so free delivery
+                            unlocks at Rs {deliveryPricing.requiredMinimumOrder}.
+                          </p>
+                          {deliveryPricing.isFreeDelivery ? (
+                            <p className="font-semibold text-emerald-700">
+                              This cart already qualifies for free delivery.
+                            </p>
+                          ) : (
+                            <>
+                              <p>
+                                Add Rs {(deliveryPricing.shortfall ?? 0).toFixed(0)} more for free delivery on this route.
+                              </p>
+                              <p className="font-semibold text-slate-700">
+                                If you checkout now, delivery will be Rs {effectiveDeliveryFee.toFixed(2)}.
+                              </p>
+                            </>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-[10px] text-emerald-900/80">
+                          Turn on location access to show the exact minimum order and delivery charge for your route.
+                        </p>
+                      )}
                     </div>
                   </div>
-                  <button
-                    onClick={onDetectLocation}
-                    className="text-[8px] font-black uppercase tracking-widest text-red-600 underline"
-                  >
-                    {customerLocation ? 'Refresh' : 'Enable'}
-                  </button>
-                </div>
-
-                {nearestOutlet ? (
-                  <div className="space-y-1.5 text-[10px] text-slate-600">
-                    {nearestOutlet.address ? (
-                      <p className="font-semibold text-slate-800">{nearestOutlet.address}</p>
+                </>
+              ) : (
+                <div className="mb-5 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                  <div className="text-[8px] font-black uppercase tracking-widest text-slate-400">
+                    {orderType === 'dinein' ? 'Dine-in Outlet' : 'Takeaway Outlet'}
+                  </div>
+                  <div className="mt-1 text-sm font-bold text-slate-900">
+                    {outletForDisplay ? outletForDisplay.name : 'Outlet not configured'}
+                  </div>
+                  <div className="mt-2 space-y-1.5 text-[10px] text-slate-600">
+                    {outletForDisplay?.address ? (
+                      <p className="font-semibold text-slate-800">{outletForDisplay.address}</p>
                     ) : null}
-                    <p>Phone: {nearestOutlet.phone}</p>
+                    {outletForDisplay ? <p>Phone: {outletForDisplay.phone}</p> : null}
                     <p>
-                      Road distance:{' '}
-                      {isResolvingOutletMatch
-                        ? 'Checking route...'
-                        : outletDistanceKm !== null
-                          ? `${outletDistanceKm.toFixed(1)} km`
-                          : 'Not available'}
+                      {orderType === 'dinein'
+                        ? 'No delivery charges apply for dine-in orders.'
+                        : 'No delivery charges apply for takeaway orders.'}
                     </p>
-                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-700">
-                      Customer location is mandatory before order placement
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-[10px] text-slate-500">
-                    Allow location access so the app can automatically route this order to the closest outlet phone number.
-                  </p>
-                )}
-              </div>
-
-              {orderType === 'delivery' && (
-                <div className="space-y-3">
-                  <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
-                    <div className="mb-2 text-[9px] font-black uppercase tracking-widest text-blue-700">
-                      Delivery Conditions
-                    </div>
-                    <div className="space-y-1.5 text-[10px] font-medium text-blue-800/80">
-                      <p>
-                        Free delivery for orders Rs {nearestOutlet?.freeDeliveryMinimumOrder ?? 150}+ within{' '}
-                        {nearestOutlet?.freeDeliveryRadiusKm ?? 3} km by road.
-                      </p>
-                      <p>
-                        Orders below minimum are charged Rs {nearestOutlet?.deliveryChargePerKm ?? 15} per road km
-                        with a minimum fee of Rs {nearestOutlet?.minimumDeliveryFee ?? 15}.
-                      </p>
-                      <p>Maximum delivery radius is {nearestOutlet?.deliveryRadiusKm ?? 7} road km.</p>
-                    </div>
                   </div>
                 </div>
               )}
@@ -330,9 +396,20 @@ const CartSidebar: React.FC<CartSidebarProps> = ({
                 <div className="flex justify-between"><span>Subtotal</span><span>Rs {total.toFixed(2)}</span></div>
                 {orderType === 'delivery' && (
                   <div className="flex justify-between gap-3">
-                    <span>Delivery {total < 150 ? '(Under Min Order)' : ''}</span>
+                    <span>
+                      Delivery{' '}
+                      {deliveryPricing.requiredMinimumOrder !== null && !deliveryPricing.isFreeDelivery
+                        ? `(Min Rs ${requiredMinimumOrder})`
+                        : ''}
+                    </span>
                     <span className={deliveryFee === -1 ? 'font-bold text-red-500' : ''}>
-                      {deliveryFee === -1 ? 'NOT SERVICEABLE' : `Rs ${effectiveDeliveryFee.toFixed(2)}`}
+                      {deliveryFee === -1
+                        ? 'NOT SERVICEABLE'
+                        : isDeliveryRoutePending
+                          ? 'ROUTE NEEDED'
+                          : deliveryPricing.isFreeDelivery
+                            ? 'FREE'
+                            : `Rs ${effectiveDeliveryFee.toFixed(2)}`}
                     </span>
                   </div>
                 )}

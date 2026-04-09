@@ -52,8 +52,8 @@ export interface OutletConfig {
   deliveryRadiusKm: number;
   freeDeliveryRadiusKm: number;
   freeDeliveryMinimumOrder: number;
+  minimumOrderIncrementPerKm: number;
   deliveryChargePerKm: number;
-  minimumDeliveryFee: number;
 }
 
 export interface CustomerLocation {
