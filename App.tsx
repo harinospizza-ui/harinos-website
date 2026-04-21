@@ -697,7 +697,12 @@ ${locationSection}*BECAUSE HARI KNOWS*
   const categoryButtons: CategoryFilter[] = ['All', ...Object.values(Category)];
 
   return (
-    <div className="min-h-screen bg-slate-50/30 text-slate-900 overflow-x-hidden">
+    <div className="relative min-h-screen overflow-x-hidden bg-[#fff7f0] text-slate-900">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[42rem] bg-[radial-gradient(circle_at_top_left,rgba(239,68,68,0.28),transparent_26%),radial-gradient(circle_at_top_right,rgba(251,191,36,0.18),transparent_24%),linear-gradient(180deg,#120507_0%,#2a0d11_18%,#fffaf4_48%,#fff1e4_100%)]" />
+      <div className="pointer-events-none absolute -left-24 top-[24rem] h-72 w-72 rounded-full bg-red-200/35 blur-3xl" />
+      <div className="pointer-events-none absolute right-[-6rem] top-[36rem] h-80 w-80 rounded-full bg-amber-200/40 blur-3xl" />
+      <div className="pointer-events-none absolute left-1/3 top-[70rem] h-64 w-64 rounded-full bg-orange-100/60 blur-3xl" />
+
       <ServiceModeModal
         isOpen={isServiceModeModalOpen}
         selectedType={orderType}
@@ -725,7 +730,7 @@ ${locationSection}*BECAUSE HARI KNOWS*
         }
       />
 
-      <main className="pt-20">
+      <main className="relative z-10 pt-20">
         {view === 'menu' ? (
           <>
             <Hero onShare={handleShare} onExploreMenu={openCategoryView} />
@@ -772,7 +777,8 @@ ${locationSection}*BECAUSE HARI KNOWS*
         )}
       </main>
 
-      <footer className="bg-slate-900 text-white py-20 border-t border-white/5 pb-32 md:pb-24">
+      <footer className="relative z-10 overflow-hidden border-t border-white/10 bg-[linear-gradient(135deg,#17070a,#2d0f14_55%,#120507)] py-20 pb-32 text-white md:pb-24">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-[radial-gradient(circle_at_top,rgba(248,113,113,0.22),transparent_65%)]" />
         <div className="max-w-7xl mx-auto px-4 text-center">
           <h2 className="font-display text-5xl md:text-6xl mb-4 text-red-500">Harino&apos;s</h2>
           <div className="text-white font-bold tracking-[0.6em] uppercase text-[9px] md:text-[11px] mb-10 opacity-40">
