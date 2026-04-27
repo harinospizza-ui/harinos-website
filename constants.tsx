@@ -498,14 +498,14 @@ export const MENU_ITEMS: MenuItem[] = [
   },
 
   // --- BURGERS ---
-  { id: 'b_tk', name: "Tikka Burger", description: "Spicy tikka patty with premium mayo.", price: 40, category: Category.BURGERS, image: "/images/tikkaburgar.jpeg", vegetarian: true, available: true },
-  { id: 'b_cl', name: "Classic Burger", description: "The original veg burger experience.", price: 50, category: Category.BURGERS, image: "/images/classicburger.jpeg", vegetarian: true, available: true },
-  { id: 'b_ch', name: "Cheese Burger", description: "Classic burger with extra cheese slice.", price: 60, category: Category.BURGERS, image: "/images/cheeseburger.jpeg", vegetarian: true, available: true },
-  { id: 'b_pn', name: "Paneer Burger", description: "Fresh paneer slab with spicy sauce.", price: 60, category: Category.BURGERS, image: "/images/paneerburger.jpeg", vegetarian: true, available: true },
-  { id: 'b_td', name: "Tandoori Burger", description: "Smoky tandoori patty burger.", price: 60, category: Category.BURGERS, image: "/images/tanduriburger.jpeg", vegetarian: true, available: true },
-  { id: 'b_cp', name: "Cheese & Paneer Burger", description: "Double the joy with cheese and paneer.", price: 70, category: Category.BURGERS, image: "/images/cheesepaneerburger.jpeg", vegetarian: true, available: true },
-  { id: 'b_in', name: "Inferno Burger", description: "Extremely spicy for the brave.", price: 70, category: Category.BURGERS, image: "/images/infernoburger.jpeg", vegetarian: true, available: true, spicy: true },
-  { id: 'b_cv', name: "Veg Carnival Burger", description: "Jumbo burger loaded with everything.", price: 90, category: Category.BURGERS, image: "/images/vegcar.jpeg", vegetarian: true, available: true, popular: true },
+  { id: 'b_tk', name: "Tikka Burger", description: "Spicy tikka patty with premium mayo.", price: 40, category: Category.BURGERS, image: "/images/tikkaburgar.jpeg", vegetarian: true, available: false },
+  { id: 'b_cl', name: "Classic Burger", description: "The original veg burger experience.", price: 50, category: Category.BURGERS, image: "/images/classicburger.jpeg", vegetarian: true, available: false },
+  { id: 'b_ch', name: "Cheese Burger", description: "Classic burger with extra cheese slice.", price: 60, category: Category.BURGERS, image: "/images/cheeseburger.jpeg", vegetarian: true, available: false },
+  { id: 'b_pn', name: "Paneer Burger", description: "Fresh paneer slab with spicy sauce.", price: 60, category: Category.BURGERS, image: "/images/paneerburger.jpeg", vegetarian: true, available: false },
+  { id: 'b_td', name: "Tandoori Burger", description: "Smoky tandoori patty burger.", price: 60, category: Category.BURGERS, image: "/images/tanduriburger.jpeg", vegetarian: true, available: false },
+  { id: 'b_cp', name: "Cheese & Paneer Burger", description: "Double the joy with cheese and paneer.", price: 70, category: Category.BURGERS, image: "/images/cheesepaneerburger.jpeg", vegetarian: true, available: false },
+  { id: 'b_in', name: "Inferno Burger", description: "Extremely spicy for the brave.", price: 70, category: Category.BURGERS, image: "/images/infernoburger.jpeg", vegetarian: true, available: false, spicy: true },
+  { id: 'b_cv', name: "Veg Carnival Burger", description: "Jumbo burger loaded with everything.", price: 90, category: Category.BURGERS, image: "/images/vegcar.jpeg", vegetarian: true, available: false, popular: true },
 
   // --- SIDE ORDERS & SNACKS ---
   { id: 's_cl', name: "Choco Lava Cake", description: "Molten chocolate center cake.", price: 60, category: Category.SIDES, image: "/images/chocolava.jpeg", vegetarian: true, available: true },
