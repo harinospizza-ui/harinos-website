@@ -68,7 +68,7 @@ const CartSidebar: React.FC<CartSidebarProps> = ({
       />
 
       <aside
-        className={`fixed top-0 right-0 z-[80] flex h-[100dvh] w-full max-w-full flex-col bg-white shadow-[0_0_100px_rgba(0,0,0,0.3)] transition-transform duration-500 md:max-w-md ${
+        className={`fixed top-0 right-0 z-[80] flex h-screen supports-[height:100dvh]:h-[100dvh] w-full max-w-full flex-col bg-white shadow-[0_0_100px_rgba(0,0,0,0.3)] transition-transform duration-500 md:max-w-md ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
         style={isOpen ? swipeDismiss.style : undefined}

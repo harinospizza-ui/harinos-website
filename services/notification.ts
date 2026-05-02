@@ -1,28 +1,31 @@
 import { getOfferNotificationMessage, getOfferReleaseSignature } from '../offerUtils';
 import { OfferCard } from '../types';
+import { getNotificationPermission, safeStorage } from './browserSupport';
 
 const DEFAULT_ICON = 'https://drive.google.com/thumbnail?id=1Gz7Qi82EYLJZxm1EfFxpXHHQ6mhKQIc4&sz=w500';
 const OFFER_RELEASE_KEY = 'harinos_offer_release_signature';
 
 export const NotificationService = {
   requestPermission: async (): Promise<boolean> => {
-    if (!('Notification' in window)) {
+    const permission = getNotificationPermission();
+
+    if (permission === 'unsupported') {
       console.warn('This browser does not support desktop notification');
       return false;
     }
 
-    if (Notification.permission === 'granted') return true;
+    if (permission === 'granted') return true;
 
-    if (Notification.permission !== 'denied') {
-      const permission = await Notification.requestPermission();
-      return permission === 'granted';
+    if (permission !== 'denied') {
+      const nextPermission = await Notification.requestPermission();
+      return nextPermission === 'granted';
     }
 
     return false;
   },
 
   show: (title: string, body: string, icon?: string) => {
-    if (Notification.permission === 'granted') {
+    if (getNotificationPermission() === 'granted') {
       new Notification(title, {
         body,
         icon: icon || DEFAULT_ICON,
@@ -32,7 +35,7 @@ export const NotificationService = {
   },
 
   notifyOfferReleases: (offers: OfferCard[], options?: { force?: boolean }) => {
-    if (Notification.permission !== 'granted') {
+    if (getNotificationPermission() !== 'granted') {
       return;
     }
 
@@ -42,7 +45,7 @@ export const NotificationService = {
     }
 
     const currentSignature = getOfferReleaseSignature(notifiableOffers);
-    const previousSignature = localStorage.getItem(OFFER_RELEASE_KEY);
+    const previousSignature = safeStorage.getItem(window.localStorage, OFFER_RELEASE_KEY);
 
     if (!options?.force && previousSignature === currentSignature) {
       return;
@@ -58,7 +61,7 @@ export const NotificationService = {
       }, index * 900);
     });
 
-    localStorage.setItem(OFFER_RELEASE_KEY, currentSignature);
+    safeStorage.setItem(window.localStorage, OFFER_RELEASE_KEY, currentSignature);
   },
 
   simulateOrderStatus: (orderId: string, type: 'takeaway' | 'delivery') => {

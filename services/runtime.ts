@@ -1,3 +1,5 @@
+import { safeStorage } from './browserSupport';
+
 const VERSION_URL = '/version.json';
 const VERSION_RELOAD_KEY = 'harinos-runtime-version-reload';
 const CONTROLLER_RELOAD_KEY = 'harinos-runtime-controller-reload';
@@ -12,11 +14,11 @@ const clearBrowserCaches = async (): Promise<void> => {
 };
 
 const reloadOnceForKey = (storageKey: string, value: string): void => {
-  if (sessionStorage.getItem(storageKey) === value) {
+  if (safeStorage.getItem(window.sessionStorage, storageKey) === value) {
     return;
   }
 
-  sessionStorage.setItem(storageKey, value);
+  safeStorage.setItem(window.sessionStorage, storageKey, value);
   window.location.reload();
 };
 
@@ -46,25 +48,29 @@ export const registerFreshRuntime = async (): Promise<void> => {
     return;
   }
 
-  const registration = await navigator.serviceWorker.register('/sw.js', {
-    scope: '/',
-    updateViaCache: 'none',
-  });
+  try {
+    const registration = await navigator.serviceWorker.register('/sw.js', {
+      scope: '/',
+      updateViaCache: 'none',
+    });
 
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    reloadOnceForKey(CONTROLLER_RELOAD_KEY, __APP_VERSION__);
-  });
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      reloadOnceForKey(CONTROLLER_RELOAD_KEY, __APP_VERSION__);
+    });
 
-  await registration.update().catch((error) => {
-    console.warn('Service worker update skipped:', error);
-  });
+    await registration.update().catch((error) => {
+      console.warn('Service worker update skipped:', error);
+    });
 
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState !== 'visible') {
-      return;
-    }
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') {
+        return;
+      }
 
-    void registration.update().catch(() => undefined);
-    void ensureLatestCode();
-  });
+      void registration.update().catch(() => undefined);
+      void ensureLatestCode();
+    });
+  } catch (error) {
+    console.warn('Service worker registration skipped:', error);
+  }
 };

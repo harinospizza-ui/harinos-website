@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { NotificationService } from '../services/notification';
 import { useInstallPrompt } from '../hooks/useInstallPrompt';
+import { getNotificationPermission } from '../services/browserSupport';
 
 interface HeaderProps {
   cartCount: number;
@@ -31,8 +32,9 @@ const Header: React.FC<HeaderProps> = ({
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
 
-    if ('Notification' in window) {
-      setNotifStatus(Notification.permission);
+    const permission = getNotificationPermission();
+    if (permission !== 'unsupported') {
+      setNotifStatus(permission);
     }
 
     return () => window.removeEventListener('scroll', handleScroll);

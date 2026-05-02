@@ -49,6 +49,10 @@ export default defineConfig(() => {
       host: '0.0.0.0',
     },
     plugins: [react(), createNoCacheVersionPlugin(buildVersion)],
+    build: {
+      target: ['es2018', 'safari13'],
+      cssTarget: 'safari13',
+    },
     define: {
       __APP_VERSION__: JSON.stringify(buildVersion),
     },

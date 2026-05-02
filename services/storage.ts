@@ -1,5 +1,6 @@
 
 import { Order } from '../types';
+import { safeStorage } from './browserSupport';
 
 const KEYS = {
   ORDERS: 'harinos_past_orders',
@@ -7,7 +8,7 @@ const KEYS = {
 
 export const StorageService = {
   getPastOrders: (): Order[] => {
-    const saved = localStorage.getItem(KEYS.ORDERS);
+    const saved = safeStorage.getItem(window.localStorage, KEYS.ORDERS);
     try {
       return saved ? JSON.parse(saved).slice(0, 3) : [];
     } catch {
@@ -17,6 +18,6 @@ export const StorageService = {
   saveOrder: (order: Order) => {
     const orders = StorageService.getPastOrders();
     const updatedOrders = [order, ...orders].slice(0, 3);
-    localStorage.setItem(KEYS.ORDERS, JSON.stringify(updatedOrders));
+    safeStorage.setItem(window.localStorage, KEYS.ORDERS, JSON.stringify(updatedOrders));
   },
 };

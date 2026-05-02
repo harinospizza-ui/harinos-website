@@ -15,6 +15,7 @@ import { MENU_ITEMS, OFFER_CARDS, OUTLET_LOCATIONS } from './constants';
 import { StorageService } from './services/storage';
 import { NotificationService } from './services/notification';
 import { saveOrderToServer } from './services/orderApi';
+import { copyTextToClipboard, getNotificationPermission } from './services/browserSupport';
 import {
   buildPricedCart,
   getAutomaticOfferBonusItems,
@@ -273,6 +274,11 @@ const App: React.FC = () => {
 
     try {
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error('Geolocation is not supported by this browser.'));
+          return;
+        }
+
         navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000 });
       });
 
@@ -342,8 +348,13 @@ const App: React.FC = () => {
     }
 
     try {
-      await navigator.clipboard.writeText('Check out Harino\'s at https://harinos.store');
-      showNotification('Link copied to clipboard.');
+      const didCopy = await copyTextToClipboard('Check out Harino\'s at https://harinos.store');
+      if (didCopy) {
+        showNotification('Link copied to clipboard.');
+        return;
+      }
+
+      alert('Visit us at harinos.store.');
     } catch (error) {
       alert('Visit us at harinos.store.');
     }
@@ -574,7 +585,7 @@ const App: React.FC = () => {
       return;
     }
 
-    if ('Notification' in window && Notification.permission === 'default') {
+    if (getNotificationPermission() === 'default') {
       await NotificationService.requestPermission();
     }
 

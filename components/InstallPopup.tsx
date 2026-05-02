@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useInstallPrompt } from '../hooks/useInstallPrompt';
+import { safeStorage } from '../services/browserSupport';
 
 interface InstallPopupProps {
   blocked?: boolean;
@@ -22,7 +23,7 @@ const InstallPopup: React.FC<InstallPopupProps> = ({ blocked = false }) => {
       return;
     }
 
-    const lastDismissedAt = Number(window.localStorage.getItem(POPUP_DISMISS_KEY) ?? '0');
+    const lastDismissedAt = Number(safeStorage.getItem(window.localStorage, POPUP_DISMISS_KEY) ?? '0');
     if (lastDismissedAt && Date.now() - lastDismissedAt < POPUP_COOLDOWN_MS) {
       return;
     }
@@ -46,7 +47,7 @@ const InstallPopup: React.FC<InstallPopupProps> = ({ blocked = false }) => {
   }, [needsIosInstructions]);
 
   const dismissPopup = () => {
-    window.localStorage.setItem(POPUP_DISMISS_KEY, Date.now().toString());
+    safeStorage.setItem(window.localStorage, POPUP_DISMISS_KEY, Date.now().toString());
     setIsVisible(false);
   };
 
