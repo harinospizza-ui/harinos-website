@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { NotificationService } from '../services/notification';
 import { useInstallPrompt } from '../hooks/useInstallPrompt';
 import { getNotificationPermission } from '../services/browserSupport';
@@ -11,6 +11,7 @@ interface HeaderProps {
   activeView: 'menu' | 'orders';
   onShare: () => void;
   onNotificationsEnabled: () => void;
+  onAdminTrigger: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -21,10 +22,16 @@ const Header: React.FC<HeaderProps> = ({
   activeView,
   onShare,
   onNotificationsEnabled,
+  onAdminTrigger,
 }) => {
   const [scrolled, setScrolled] = useState(false);
   const [notifStatus, setNotifStatus] = useState<NotificationPermission>('default');
   const [showInstallHelp, setShowInstallHelp] = useState(false);
+  const [isHoldingLogo, setIsHoldingLogo] = useState(false);
+  const [showHoldLabel, setShowHoldLabel] = useState(false);
+  const holdTimeoutRef = useRef<number | null>(null);
+  const holdLabelTimeoutRef = useRef<number | null>(null);
+  const pointerDownAtRef = useRef(0);
   const logoUrl = '/icon-192.png';
   const { canPromptInstall, needsIosInstructions, isInstalled, promptInstall } = useInstallPrompt();
 
@@ -65,6 +72,41 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   const isScrolledOrLight = scrolled || activeView === 'orders';
+  const resetLogoHold = () => {
+    if (holdTimeoutRef.current !== null) {
+      window.clearTimeout(holdTimeoutRef.current);
+      holdTimeoutRef.current = null;
+    }
+
+    if (holdLabelTimeoutRef.current !== null) {
+      window.clearTimeout(holdLabelTimeoutRef.current);
+      holdLabelTimeoutRef.current = null;
+    }
+
+    setIsHoldingLogo(false);
+    setShowHoldLabel(false);
+  };
+
+  const startLogoHold = () => {
+    pointerDownAtRef.current = Date.now();
+    setIsHoldingLogo(true);
+    holdLabelTimeoutRef.current = window.setTimeout(() => setShowHoldLabel(true), 1000);
+    holdTimeoutRef.current = window.setTimeout(() => {
+      navigator.vibrate?.(200);
+      onAdminTrigger();
+      resetLogoHold();
+    }, 7000);
+  };
+
+  const finishLogoHold = () => {
+    const elapsed = Date.now() - pointerDownAtRef.current;
+    const wasPending = holdTimeoutRef.current !== null;
+    resetLogoHold();
+
+    if (wasPending && elapsed < 200) {
+      onViewMenu();
+    }
+  };
 
   return (
     <nav
@@ -74,18 +116,40 @@ const Header: React.FC<HeaderProps> = ({
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center">
-          <button onClick={onViewMenu} className="flex items-center space-x-3 cursor-pointer group">
+          <button
+            onPointerDown={startLogoHold}
+            onPointerUp={finishLogoHold}
+            onPointerLeave={resetLogoHold}
+            onPointerCancel={resetLogoHold}
+            onContextMenu={(event) => event.preventDefault()}
+            className="relative flex cursor-pointer items-center space-x-3 group"
+          >
+            <style>{`
+              @keyframes holdRing {
+                from { transform: scale(0.6); opacity: 0; box-shadow: 0 0 0 0 rgba(220,38,38,0.8); }
+                to { transform: scale(1.3); opacity: 1; box-shadow: 0 0 0 12px rgba(220,38,38,0); }
+              }
+            `}</style>
             <div
-              className={`transition-all duration-500 rounded-2xl flex items-center justify-center overflow-hidden shadow-xl ring-4 ring-white/10 ${
+              className={`relative transition-all duration-500 rounded-2xl flex items-center justify-center overflow-hidden shadow-xl ring-4 ring-white/10 ${
                 isScrolledOrLight ? 'w-10 h-10' : 'w-14 h-14'
               }`}
             >
+              <span
+                className="pointer-events-none absolute inset-0 rounded-2xl"
+                style={isHoldingLogo ? { animation: 'holdRing 7s linear forwards' } : undefined}
+              />
               <img
                 src={logoUrl}
                 alt="Harino's"
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform"
               />
             </div>
+            {showHoldLabel && (
+              <span className="absolute left-0 top-full mt-2 rounded-full bg-slate-950 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-white shadow-xl">
+                Keep holding...
+              </span>
+            )}
             <div className="text-left">
               <span
                 className={`block transition-all duration-500 font-display font-bold tracking-tight leading-none ${

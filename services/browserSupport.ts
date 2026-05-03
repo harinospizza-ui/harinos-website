@@ -15,6 +15,15 @@ export const safeStorage = {
       return false;
     }
   },
+
+  removeItem: (storage: Storage | undefined, key: string): boolean => {
+    try {
+      storage?.removeItem(key);
+      return true;
+    } catch {
+      return false;
+    }
+  },
 };
 
 export const getNotificationPermission = (): NotificationPermission | 'unsupported' => {

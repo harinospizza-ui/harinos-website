@@ -96,7 +96,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                 </div>
                 <div className="mt-1 text-sm font-bold text-slate-900">{outletName}</div>
                 {outletPhone && (
-                  <div className="mt-1 text-[10px] font-medium text-slate-600">WhatsApp: {outletPhone}</div>
+                  <div className="mt-1 text-[10px] font-medium text-slate-600">Outlet phone: {outletPhone}</div>
                 )}
               </div>
             )}
@@ -104,7 +104,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
               onClick={onPaymentComplete}
               className="flex w-full items-center justify-center space-x-3 rounded-2xl bg-red-600 py-4 text-[11px] font-bold uppercase tracking-[0.2em] text-white shadow-xl transition-all active:scale-95"
             >
-              <span>{outletName ? `Place order with ${outletName}` : 'Place your order on WhatsApp'}</span>
+              <span>{outletName ? `Place order with ${outletName}` : 'Place your order'}</span>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
               </svg>

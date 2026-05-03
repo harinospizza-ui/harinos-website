@@ -16,6 +16,7 @@ dist-ssr
 backend/.env
 backend/dist
 backend/orders-cache
+.harinos-shared-orders
 
 # Editor directories and files
 .vscode/*

@@ -4,6 +4,7 @@ import {
   Category,
   CategoryFilter,
   CustomerLocation,
+  AdminSession,
   MenuItem,
   OfferCard,
   Order,
@@ -11,10 +12,10 @@ import {
   OrderType,
   OutletConfig,
 } from './types';
-import { MENU_ITEMS, OFFER_CARDS, OUTLET_LOCATIONS } from './constants';
+import { MENU_ITEMS, OFFER_CARDS } from './constants';
 import { StorageService } from './services/storage';
 import { NotificationService } from './services/notification';
-import { saveOrderToServer } from './services/orderApi';
+import { saveOrderToServer, saveOrderToSharedStore } from './services/orderApi';
 import { copyTextToClipboard, getNotificationPermission } from './services/browserSupport';
 import {
   buildPricedCart,
@@ -28,7 +29,6 @@ import {
   OutletMatch,
   buildCustomerMapUrl,
   findNearestOutletByRoadDistance,
-  sanitizePhoneNumber,
 } from './outletUtils';
 import { getDeliveryPricingSummary } from './deliveryPricing';
 import Header from './components/Header';
@@ -40,10 +40,12 @@ import PastOrders from './components/PastOrders';
 import PaymentModal from './components/PaymentModal';
 import InstallPopup from './components/InstallPopup';
 import ServiceModeModal from './components/ServiceModeModal';
+import AdminPanel from './components/AdminPanel';
 import { useSwipeDismiss } from './hooks/useSwipeDismiss';
 
 const DISPLAY_OFFERS = OFFER_CARDS.slice(0, 3);
 const APP_HISTORY_NAMESPACE = 'harinos-ui';
+const CUSTOMER_CARE_WHATSAPP_URL = 'https://wa.me/917818958571';
 
 type AppScreen = 'menu' | 'orders' | 'category' | 'cart' | 'payment' | 'success';
 
@@ -54,13 +56,28 @@ interface ResolvedOrderContext {
 }
 
 const App: React.FC = () => {
+  const [outlets, setOutlets] = useState<OutletConfig[]>(() => StorageService.getMergedOutlets());
+  const [menuItems, setMenuItems] = useState<MenuItem[]>(() => {
+    const overrides = StorageService.getItemAvailabilityOverrides();
+    return MENU_ITEMS.map((item) => ({
+      ...item,
+      available: overrides[item.id] ?? item.available,
+    }));
+  });
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('All');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [isPhoneModalOpen, setIsPhoneModalOpen] = useState(false);
+  const [phoneDraft, setPhoneDraft] = useState('');
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [showOrderSuccess, setShowOrderSuccess] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
+  const [outletAnnouncement, setOutletAnnouncement] = useState<string | null>(null);
+  const [adminSession, setAdminSession] = useState<AdminSession | null>(
+    StorageService.getAdminSession(),
+  );
+  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(() => adminSession !== null);
   const [orderType, setOrderType] = useState<OrderType>('takeaway');
   const [isServiceModeModalOpen, setIsServiceModeModalOpen] = useState(true);
   const [customerLocation, setCustomerLocation] = useState<CustomerLocation | null>(null);
@@ -121,8 +138,8 @@ const App: React.FC = () => {
     [],
   );
   const activeOutlets = useMemo(
-    () => OUTLET_LOCATIONS.filter((outlet) => outlet.enabled),
-    [],
+    () => outlets.filter((outlet) => outlet.enabled),
+    [outlets],
   );
   const nearestOutlet = nearestOutletMatch?.outlet ?? null;
   const outletDistanceKm = nearestOutletMatch?.distanceKm ?? null;
@@ -151,7 +168,69 @@ const App: React.FC = () => {
   }, [applyAppScreen, replaceAppScreen]);
 
   useEffect(() => {
+    const refreshOutletConfig = () => {
+      setOutlets(StorageService.getMergedOutlets());
+    };
+
+    refreshOutletConfig();
+    const interval = window.setInterval(refreshOutletConfig, 30000);
+    window.addEventListener('storage', refreshOutletConfig);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('storage', refreshOutletConfig);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (StorageService.getCustomerLocation()) {
+      return;
+    }
+
+    navigator.geolocation?.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        let address = '';
+        try {
+          const controller = new AbortController();
+          const timeout = window.setTimeout(() => controller.abort(), 5000);
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
+            { signal: controller.signal },
+          );
+          window.clearTimeout(timeout);
+          const geo = (await response.json()) as { display_name?: string };
+          address = geo.display_name ?? '';
+        } catch {
+          // NOTE: Customer location capture is best-effort and must never block browsing.
+        }
+
+        StorageService.saveCustomerLocation(latitude, longitude, address);
+      },
+      () => {
+        // NOTE: Permission denial or unsupported geolocation is silent by design.
+      },
+      { enableHighAccuracy: true, timeout: 8000 },
+    );
+  }, []);
+
+  useEffect(() => {
     const checkStoreStatus = () => {
+      const selectedOutletId = selectedOutlet?.id ?? '';
+      setOutletAnnouncement(StorageService.getOutletAnnouncement(selectedOutletId));
+
+      const override = StorageService.getOutletOpen(selectedOutletId);
+      if (override === false) {
+        setIsStoreOpen(false);
+        setStatusMessage('Outlet is currently closed. Please check back later.');
+        return;
+      }
+
+      if (override === true) {
+        setIsStoreOpen(true);
+        setStatusMessage('Open now. Orders are being prepared fresh.');
+        return;
+      }
+
       const now = new Date();
       const currentTimeInMins = now.getHours() * 60 + now.getMinutes();
       const openingTime = 11 * 60;
@@ -172,6 +251,26 @@ const App: React.FC = () => {
 
     return () => {
       window.clearInterval(interval);
+    };
+  }, [selectedOutlet?.id]);
+
+  useEffect(() => {
+    const refreshMenuAvailability = () => {
+      const overrides = StorageService.getItemAvailabilityOverrides();
+      setMenuItems(
+        MENU_ITEMS.map((item) => ({
+          ...item,
+          available: overrides[item.id] ?? item.available,
+        })),
+      );
+    };
+
+    refreshMenuAvailability();
+    const interval = window.setInterval(refreshMenuAvailability, 30000);
+    window.addEventListener('storage', refreshMenuAvailability);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('storage', refreshMenuAvailability);
     };
   }, []);
 
@@ -500,7 +599,7 @@ const App: React.FC = () => {
 
     const reorderItems = manualOrderItems
       .map((item) => {
-        const freshItem = MENU_ITEMS.find((menuItem) => menuItem.id === item.id);
+        const freshItem = menuItems.find((menuItem) => menuItem.id === item.id);
         const nextItem = freshItem ?? item;
         return normalizeStoredCartItem({
           ...nextItem,
@@ -521,14 +620,14 @@ const App: React.FC = () => {
     setIsCartOpen(true);
     pushAppScreen('cart');
     showNotification('Last order restored to basket.');
-  }, [pushAppScreen, showNotification]);
+  }, [menuItems, pushAppScreen, showNotification]);
 
   const filteredItems = useMemo(
     () =>
       selectedCategory === 'All'
-        ? MENU_ITEMS
-        : MENU_ITEMS.filter((item) => item.category === selectedCategory),
-    [selectedCategory],
+        ? menuItems
+        : menuItems.filter((item) => item.category === selectedCategory),
+    [menuItems, selectedCategory],
   );
 
   const baseSubtotal = useMemo(
@@ -604,9 +703,94 @@ const App: React.FC = () => {
     }
 
     setIsCartOpen(false);
+    if (!StorageService.getCustomerPhone() && !StorageService.hasSkippedCustomerPhone()) {
+      try {
+        if ('contacts' in navigator && 'ContactsManager' in window) {
+          const contacts = await (
+            navigator as Navigator & {
+              contacts?: { select: (fields: string[], options: { multiple: boolean }) => Promise<Array<{ tel?: string[] }>> };
+            }
+          ).contacts?.select(['tel'], { multiple: false });
+          const phone = contacts?.[0]?.tel?.[0]?.replace(/\D/g, '');
+          if (phone) {
+            StorageService.saveCustomerPhone(phone);
+            setIsPaymentOpen(true);
+            pushAppScreen('payment');
+            return;
+          }
+        }
+      } catch {
+        // NOTE: Contact Picker requires a user gesture and is unavailable on iOS/desktop; manual fallback follows.
+      }
+
+      setIsPhoneModalOpen(true);
+      return;
+    }
+
     setIsPaymentOpen(true);
     pushAppScreen('payment');
   };
+
+  const openPaymentAfterPhoneStep = useCallback(() => {
+    setIsPhoneModalOpen(false);
+    setIsPaymentOpen(true);
+    pushAppScreen('payment');
+  }, [pushAppScreen]);
+
+  const saveCustomerPhoneAndContinue = useCallback(() => {
+    StorageService.saveCustomerPhone(phoneDraft.trim());
+    openPaymentAfterPhoneStep();
+  }, [openPaymentAfterPhoneStep, phoneDraft]);
+
+  const skipCustomerPhoneAndContinue = useCallback(() => {
+    StorageService.skipCustomerPhone();
+    openPaymentAfterPhoneStep();
+  }, [openPaymentAfterPhoneStep]);
+
+  const getSilentLocation = useCallback(async (): Promise<CustomerLocation | null> => {
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error('Geolocation is not supported by this browser.'));
+          return;
+        }
+
+        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 3000 });
+      });
+
+      return {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        mapUrl: buildCustomerMapUrl(position.coords.latitude, position.coords.longitude),
+      };
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const reverseGeocodeLocation = useCallback(async (
+    location: CustomerLocation | null,
+  ): Promise<string | undefined> => {
+    if (!location) {
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 4000);
+
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${location.latitude}&lon=${location.longitude}&format=json`,
+        { signal: controller.signal },
+      );
+      const geo = (await response.json()) as { display_name?: string };
+      return geo.display_name;
+    } catch {
+      return undefined;
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }, []);
 
   const handlePaymentComplete = async () => {
     const checkoutContext = await resolveOrderContext();
@@ -622,7 +806,24 @@ const App: React.FC = () => {
     setIsPaymentOpen(false);
 
     const { customerLocation: resolvedLocation, outlet, distanceKm } = checkoutContext;
-    const locationString = orderType === 'delivery' && resolvedLocation ? resolvedLocation.mapUrl : 'Not shared';
+    const savedLocation = StorageService.getCustomerLocation();
+    const freshLocation = await getSilentLocation();
+    const finalLocation = resolvedLocation ?? freshLocation ?? (
+      savedLocation
+        ? {
+            latitude: savedLocation.lat,
+            longitude: savedLocation.lng,
+            mapUrl: buildCustomerMapUrl(savedLocation.lat, savedLocation.lng),
+          }
+        : null
+    );
+    const customerAddress = await reverseGeocodeLocation(finalLocation) ?? savedLocation?.address;
+    if (finalLocation) {
+      StorageService.saveCustomerLocation(finalLocation.latitude, finalLocation.longitude, customerAddress ?? '');
+    }
+    const locationString = orderType === 'delivery' && finalLocation ? finalLocation.mapUrl : 'Not shared';
+    const customerPhone = StorageService.getCustomerPhone() ?? undefined;
+    const receivedAt = new Date().toISOString();
     const orderId = `HRN-${Date.now().toString().slice(-4)}`;
     const orderItems: OrderItem[] = pricedCart.map((item) => ({ ...item }));
     const newOrder: Order = {
@@ -638,6 +839,19 @@ const App: React.FC = () => {
       outletAddress: outlet.address,
       customerLocationUrl: locationString,
       distanceKm,
+      customerPhone,
+      customerLatitude: finalLocation?.latitude,
+      customerLongitude: finalLocation?.longitude,
+      customerAddress,
+      receivedAt,
+      status: 'new',
+      statusHistory: [
+        {
+          status: 'new',
+          timestamp: receivedAt,
+          changedBy: 'customer',
+        },
+      ],
     };
 
     try {
@@ -662,48 +876,31 @@ const App: React.FC = () => {
     }
 
     StorageService.saveOrder(newOrder);
+    StorageService.saveOrderToOutlet(newOrder);
+    try {
+      await saveOrderToSharedStore(newOrder);
+    } catch (error) {
+      console.warn('Shared order sync unavailable; order kept on this device.', error);
+    }
     setPastOrders((currentOrders) => [newOrder, ...currentOrders].slice(0, 3));
     NotificationService.simulateOrderStatus(orderId, orderType === 'delivery' ? 'delivery' : 'takeaway');
 
-    const itemsText = orderItems
-      .map((item) => {
-        const sizeText = item.selectedSize ? ` [${item.selectedSize}]` : '';
-        return `${item.quantity}x ${item.name}${sizeText} - Rs ${item.totalPrice}`;
-      })
-      .join('\n');
+    try {
+      const channel = new BroadcastChannel('harinos_orders');
+      channel.postMessage({ type: 'NEW_ORDER', outletId: outlet.id, orderId });
+      channel.close();
+    } catch {
+      // NOTE: WhatsApp redirect has been removed. Local admin panels receive orders through storage polling.
+    }
 
-    const outletAddressLine = outlet.address ? `OUTLET ADDRESS: ${outlet.address}\n` : '';
-    const roadDistanceLine =
-      orderType === 'delivery' && distanceKm !== null ? `ROAD DISTANCE: ${distanceKm.toFixed(1)} km\n` : '';
-    const locationSection =
-      orderType === 'delivery'
-        ? `*LOCATION:*\n${locationString}\n--------------------------\n`
-        : '';
-    const whatsappMessage = `
-*HARINO'S ORDER - ${orderId}*
---------------------------
-TYPE: ${orderType.toUpperCase()}
-PAYMENT: COMPLETED
---------------------------
-OUTLET: ${outlet.name}
-OUTLET PHONE: ${outlet.phone}
-${outletAddressLine}${roadDistanceLine}--------------------------
-*ITEMS:*
-${itemsText}
---------------------------
-SUBTOTAL: Rs ${subtotal.toFixed(2)}
-DELIVERY: Rs ${finalDeliveryFee.toFixed(2)}
-GST (5% INCL): Rs ${includedGst.toFixed(2)}
-*TOTAL: Rs ${currentTotal.toFixed(2)}*
---------------------------
-${locationSection}*BECAUSE HARI KNOWS*
-    `.trim();
-
-    window.open(`https://wa.me/${sanitizePhoneNumber(outlet.phone)}?text=${encodeURIComponent(whatsappMessage)}`, '_blank');
     setShowOrderSuccess(true);
     replaceAppScreen('success');
     setCart([]);
   };
+
+  const handleAdminTrigger = useCallback(() => {
+    setIsAdminPanelOpen(true);
+  }, []);
 
   const categoryButtons: CategoryFilter[] = ['All', ...Object.values(Category)];
 
@@ -729,11 +926,18 @@ ${locationSection}*BECAUSE HARI KNOWS*
         activeView={view}
         onShare={handleShare}
         onNotificationsEnabled={handleNotificationsEnabled}
+        onAdminTrigger={handleAdminTrigger}
       />
+      {outletAnnouncement && (
+        <div className="fixed left-0 right-0 top-[72px] z-[90] bg-amber-500 px-4 py-2 text-center text-[11px] font-black uppercase tracking-widest text-slate-900 shadow-lg">
+          {outletAnnouncement}
+        </div>
+      )}
       <InstallPopup
         blocked={
           isCartOpen ||
           isPaymentOpen ||
+          isPhoneModalOpen ||
           showOrderSuccess ||
           isCategoryModalOpen ||
           isServiceModeModalOpen ||
@@ -799,6 +1003,18 @@ ${locationSection}*BECAUSE HARI KNOWS*
         </div>
       </footer>
 
+      <a
+        href={CUSTOMER_CARE_WHATSAPP_URL}
+        target="_blank"
+        rel="noreferrer"
+        aria-label="Chat with customer care on WhatsApp"
+        className="fixed bottom-6 right-4 z-[60] flex h-14 w-14 items-center justify-center rounded-2xl bg-green-600 text-white shadow-2xl shadow-green-900/30 ring-4 ring-white/70 transition-transform active:scale-95 md:bottom-8 md:right-8"
+      >
+        <svg className="h-7 w-7" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true">
+          <path d="M16.02 3.2A12.7 12.7 0 0 0 5.07 22.33L3.5 28.8l6.63-1.52A12.71 12.71 0 1 0 16.02 3.2Zm0 2.38a10.33 10.33 0 0 1 8.78 15.77 10.33 10.33 0 0 1-13.9 3.5l-.4-.24-3.76.86.9-3.66-.26-.42A10.32 10.32 0 0 1 16.02 5.58Zm-4.05 5.3c-.25 0-.66.1-1 .47-.35.38-1.32 1.3-1.32 3.15 0 1.86 1.35 3.65 1.54 3.9.19.25 2.6 4.16 6.45 5.67 3.2 1.26 3.85 1.01 4.54.95.7-.07 2.25-.92 2.57-1.82.32-.9.32-1.67.22-1.82-.1-.16-.35-.25-.73-.44-.38-.2-2.25-1.11-2.6-1.24-.35-.13-.6-.2-.86.19-.25.38-.98 1.24-1.2 1.49-.22.25-.44.29-.82.1-.38-.2-1.6-.6-3.05-1.9-1.13-1-1.9-2.24-2.12-2.62-.22-.38-.02-.59.17-.78.17-.17.38-.44.57-.67.19-.22.25-.38.38-.63.13-.25.06-.48-.03-.67-.1-.2-.86-2.07-1.18-2.84-.31-.75-.63-.65-.86-.66h-.73Z" />
+        </svg>
+      </a>
+
       {isCategoryModalOpen && (
         <div className="fixed inset-0 z-[120] flex items-end justify-center p-0 sm:items-center sm:p-4">
           <div
@@ -851,7 +1067,7 @@ ${locationSection}*BECAUSE HARI KNOWS*
       )}
 
       {pricedCart.length > 0 && !isCartOpen && (
-        <div className="fixed bottom-6 left-4 right-20 z-50 md:hidden">
+        <div className="fixed bottom-24 left-4 right-4 z-50 md:hidden">
           <button
             onClick={openCartView}
             className="w-full bg-slate-900 text-white px-5 py-4 rounded-2xl shadow-2xl flex items-center justify-between border border-white/10"
@@ -901,6 +1117,42 @@ ${locationSection}*BECAUSE HARI KNOWS*
         outletPhone={selectedOutlet?.phone}
       />
 
+      {isPhoneModalOpen && (
+        <div className="fixed inset-0 z-[115] flex items-end justify-center bg-slate-900/70 backdrop-blur-md sm:items-center">
+          <div className="w-full max-w-md rounded-t-[2rem] bg-white p-6 shadow-2xl sm:rounded-[2rem]">
+            <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-200 sm:hidden" />
+            <h3 className="font-display text-2xl font-bold text-slate-900">Get delivery updates by SMS?</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              Add a phone number for this device. You can skip this and continue checkout.
+            </p>
+            <input
+              value={phoneDraft}
+              onChange={(event) => setPhoneDraft(event.target.value.replace(/[^\d+ ]/g, ''))}
+              type="tel"
+              inputMode="tel"
+              placeholder="Phone number"
+              className="mt-5 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-lg font-bold text-slate-900 outline-none focus:border-red-500"
+            />
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={saveCustomerPhoneAndContinue}
+                className="flex-1 rounded-2xl bg-red-600 px-5 py-4 text-[11px] font-black uppercase tracking-widest text-white"
+              >
+                Save & Continue
+              </button>
+              <button
+                type="button"
+                onClick={skipCustomerPhoneAndContinue}
+                className="rounded-2xl border border-slate-200 px-5 py-4 text-[11px] font-black uppercase tracking-widest text-slate-500"
+              >
+                Skip
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {notification && (
         <div className="fixed bottom-32 left-1/2 -translate-x-1/2 z-[100] w-full max-w-[90%] md:max-w-xs">
           <div className="bg-slate-900 text-white px-6 md:px-8 py-4 rounded-2xl shadow-2xl border border-red-600/30 mx-auto">
@@ -939,6 +1191,20 @@ ${locationSection}*BECAUSE HARI KNOWS*
             </button>
           </div>
         </div>
+      )}
+      {isAdminPanelOpen && (
+        <AdminPanel
+          session={adminSession}
+          onSessionChange={(session) => {
+            setAdminSession(session);
+          }}
+          onClose={() => setIsAdminPanelOpen(false)}
+          onLogout={() => {
+            StorageService.clearAdminSession();
+            setAdminSession(null);
+          }}
+          outlets={outlets}
+        />
       )}
     </div>
   );

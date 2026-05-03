@@ -92,6 +92,58 @@ export interface Order {
   outletAddress?: string;
   customerLocationUrl?: string;
   distanceKm?: number | null;
+  customerPhone?: string;
+  customerLatitude?: number;
+  customerLongitude?: number;
+  customerAddress?: string;
+  receivedAt?: string;
+  status?: OrderStatus;
+  statusHistory?: StatusEvent[];
 }
 
 export type OrderType = 'takeaway' | 'delivery' | 'dinein';
+
+export type OrderStatus =
+  | 'new'
+  | 'preparing'
+  | 'ready'
+  | 'out_for_delivery'
+  | 'done'
+  | 'cancelled';
+
+export interface StatusEvent {
+  status: OrderStatus;
+  timestamp: string;
+  changedBy: string;
+}
+
+export type AdminRole = 'admin' | 'manager' | 'staff';
+
+export interface AdminSession {
+  role: AdminRole;
+  username: string;
+  outletId: string | null;
+  loginTime: string;
+  lastActivityTime: string;
+}
+
+export interface MonthlySalesReport {
+  month: string;
+  monthLabel: string;
+  outletId: string | null;
+  outletName: string;
+  totalRevenue: number;
+  totalOrders: number;
+  avgOrderValue: number;
+  topItems: Array<{ name: string; qty: number; revenue: number }>;
+  peakHour: number;
+  orderTypeSplit: {
+    delivery: number;
+    takeaway: number;
+    dinein: number;
+  };
+  deliveryVsPickupRevenue: {
+    delivery: number;
+    pickup: number;
+  };
+}
