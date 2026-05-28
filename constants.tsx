@@ -43,7 +43,7 @@ export const OFFER_CARDS: OfferCard[] = [
     id: 'offer-card-1',
 
     // Enable / Disable
-    enabled: true,
+    enabled: false,
 
     // Images
     image: '/images/vegover.jpeg',
@@ -76,7 +76,7 @@ export const OFFER_CARDS: OfferCard[] = [
     id: 'offer-card-2',
 
     // Enable / Disable
-    enabled: true,
+    enabled: false,
 
     // Images
     image: '/images/hari.jpeg',
