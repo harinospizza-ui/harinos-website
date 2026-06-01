@@ -326,7 +326,7 @@ export const MENU_ITEMS: MenuItem[] = [
     category: Category.MOMOS_FRIES,
     image: "/images/steammomos.jpeg",
     vegetarian: true,
-    available: true,
+    available: false,
     sizes: [{ label: 'Half', price: 40 }, { label: 'Full', price: 60 }]
   },
   {
@@ -348,7 +348,7 @@ export const MENU_ITEMS: MenuItem[] = [
     category: Category.MOMOS_FRIES,
     image: "/images/friedmomos.jpeg",
     vegetarian: true,
-    available: true,
+    available: false,
     sizes: [{ label: 'Half', price: 40 }, { label: 'Full', price: 60 }]
   },
   {
@@ -370,7 +370,7 @@ export const MENU_ITEMS: MenuItem[] = [
     category: Category.MOMOS_FRIES,
     image: "/images/tandurimomos.jpeg",
     vegetarian: true,
-    available: true,
+    available: false,
     sizes: [{ label: 'Half', price: 50 }, { label: 'Full', price: 70 }]
   },
   {
@@ -392,7 +392,7 @@ export const MENU_ITEMS: MenuItem[] = [
     category: Category.MOMOS_FRIES,
     image: "/images/cheesemomos.jpeg",
     vegetarian: true,
-    available: true,
+    available: false,
     sizes: [{ label: 'Half', price: 70 }, { label: 'Full', price: 100 }]
   },
   {
@@ -436,7 +436,7 @@ export const MENU_ITEMS: MenuItem[] = [
     category: Category.MOMOS_FRIES,
     image: "/images/gravymomos.jpeg",
     vegetarian: true,
-    available: true,
+    available: false,
     sizes: [{ label: 'Half', price: 80 }, { label: 'Full', price: 120 }]
   },
   {
