@@ -183,7 +183,7 @@ const App: React.FC = () => {
       const closingTime = 20 * 60;
 
       if (currentTimeInMins < openingTime || currentTimeInMins >= closingTime) {
-        setIsStoreOpen(false);
+        setIsStoreOpen(true);
         setStatusMessage('Store is currently closed. Open: 11:00 AM - 08:00 PM.');
         return;
       }
